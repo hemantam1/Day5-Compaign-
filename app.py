@@ -5,14 +5,14 @@ import numpy as np
 import pandas as pd
 from backend import ProductCatalog, SearchEngine
 
-
+# ======================
 # PAGE CONFIG
-
+# ======================
 st.set_page_config(page_title="Amazon Sponsored Demo", layout="wide")
 
-
-# CSS 
-
+# ======================
+# CSS
+# ======================
 st.markdown("""
 <style>
 .card {
@@ -53,10 +53,6 @@ button {
     cursor: pointer;
     font-weight: bold;
     margin-top: 8px;
-    transition: background-color 0.2s;
-}
-button:hover {
-    background-color: #e68a00;
 }
 .product-name {
     white-space: nowrap;
@@ -67,87 +63,82 @@ button:hover {
 </style>
 """, unsafe_allow_html=True)
 
+# ======================
+# 🔒 CATALOG – SESSION LOCK (MOST IMPORTANT FIX)
+# ======================
+if "catalog" not in st.session_state:
+    catalog = ProductCatalog()
+    catalog.generate_products()
+    st.session_state.catalog = catalog
+else:
+    catalog = st.session_state.catalog
 
-# GENERATE DATA
-
-catalog = ProductCatalog()
-catalog.generate_products()
 df = catalog.to_dataframe()
 engine = SearchEngine(df, catalog)
 
-# STREAMLIT UI
-
+# ======================
+# UI
+# ======================
 st.title("🛒 Amazon-Style Sponsored Product Demo")
 
-
-# Search Input
-
+# Search
 query = st.text_input("Search products", placeholder="Search laptop, smartwatch, earbuds...")
 
-
-# Dynamic Suggestions
-
+# Suggestions
 if query:
     suggestions = engine.suggestions(query)
     if suggestions:
-        st.caption("Suggestions:")
         cols_s = st.columns(len(suggestions))
         for i, s in enumerate(suggestions):
             if cols_s[i].button(s):
                 query = s
 
-
-# Search Results
-
+# Results
 results = df.copy()
 if query:
-    search_results = engine.search(query)
-    if not search_results.empty:
-        results = search_results
-    else:
-        results = pd.DataFrame()  # No match
+    results = engine.search(query)
+    if results.empty:
+        st.info("No products found")
 
-
-# Product Display (Dynamic Grid + Uniform Images)
-
+# ======================
+# PRODUCT GRID
+# ======================
 if not results.empty:
     st.markdown("### 🛍 Products")
-    num_cols = min(4, len(results))
-    cols = st.columns(num_cols)
+    cols = st.columns(4)
 
     for i, row in results.iterrows():
-        col = cols[i % num_cols]
-        with col:
+        with cols[i % 4]:
             st.markdown("<div class='card'>", unsafe_allow_html=True)
 
-            # Robust Image Loading
+            # Image
             category_folder = row["category"].replace(" ", "_")
-            base_path = os.path.join(os.getcwd(), "images")
-            folder_path = os.path.join(base_path, category_folder)
-            available_images = []
-            for ext in ["*.jpg", "*.jpeg", "*.png"]:
-                available_images.extend(glob.glob(os.path.join(folder_path, ext)))
+            folder_path = os.path.join("images", category_folder)
+            images = []
+            for ext in ("*.jpg", "*.jpeg", "*.png"):
+                images.extend(glob.glob(os.path.join(folder_path, ext)))
 
-            if available_images:
-                image_path = np.random.choice(available_images)
-                if os.path.exists(image_path):
-                    st.image(image_path, width=200)
-                else:
-                    st.image("https://via.placeholder.com/200", width=200)
+            if images:
+                st.image(np.random.choice(images), width=200)
             else:
                 st.image("https://via.placeholder.com/200", width=200)
 
-            # Product Details with tooltip
-            st.markdown(f"<span class='product-name' title='{row['name']}'>{row['name']}</span>", unsafe_allow_html=True)
+            # Details
+            st.markdown(
+                f"<span class='product-name' title='{row['name']}'>{row['name']}</span>",
+                unsafe_allow_html=True
+            )
             st.write(row["brand"])
             st.markdown(f"<div class='price'>${row['price']}</div>", unsafe_allow_html=True)
 
-            # Sponsored Badge
             if row["sponsored"] == "Yes":
                 st.markdown("<div class='sponsored'>Sponsored</div>", unsafe_allow_html=True)
 
-            # Buy Button → open checkout in new tab (multi-page)
-            checkout_url = f"/Checkout?product_id={row['id']}"  # must match pages/Checkout.py
-            st.markdown(f'<a href="{checkout_url}" target="_blank"><button>🛒 Buy</button></a>', unsafe_allow_html=True)
+            # ✅ CORRECT BUY LINK (product_id locked)
+            checkout_url = f"/checkout?product_id={row['id']}"
+            st.markdown(
+                f'<a href="{checkout_url}" target="_blank"><button>🛒 Buy</button></a>',
+                unsafe_allow_html=True
+            )
 
             st.markdown("</div>", unsafe_allow_html=True)
