@@ -5,39 +5,35 @@ import uuid
 from datetime import datetime, timedelta
 
 # ---------------------------
-# Database Connection
+# 1. Database Connection
 # ---------------------------
-# Note: switched to pymysql for better compatibility with MySQL 8.0 auth
-# Ensure you run: pip install pymysql
+# Database credentials aapke original code ke hisaab se set hain
 engine = create_engine('mysql+pymysql://root:Admin%40123@localhost/amazon_ads_db')
 
-# ---------------------------
-# Data Generation Function
-# ---------------------------
-def generate_realistic_company_data():
+def generate_3_year_realistic_data():
     try:
-        # Helper: random date generator
+        # Helper: random date generator for initial creation dates
         def random_date(start_days_ago, end_days_ago):
             return datetime.now() - timedelta(days=np.random.randint(end_days_ago, start_days_ago))
 
         # ---------------------------
-        # 1. Portfolios
+        # 2. Portfolios (4 Main Categories)
         # ---------------------------
         product_lines = ['Premium_Audio', 'Gaming_Accessories', 'Office_Setup', 'Mobile_Gear']
         p_ids = [str(uuid.uuid4()) for _ in range(len(product_lines))]
         df_p = pd.DataFrame({
             'id': p_ids,
             'name': product_lines,
-            'budget_amount': np.random.uniform(20000, 50000, len(product_lines)),
-            'budget_start': [random_date(400, 365).date() for _ in range(len(product_lines))],
-            'budget_end': [(datetime.now() + timedelta(days=120)).date() for _ in range(len(product_lines))],
+            'budget_amount': np.random.uniform(50000, 100000, len(product_lines)),
+            'budget_start': [random_date(1200, 1100).date() for _ in range(len(product_lines))],
+            'budget_end': [(datetime.now() + timedelta(days=365)).date() for _ in range(len(product_lines))],
             'status': 'ENABLED',
-            'created_at': [random_date(400, 365) for _ in range(len(product_lines))]
+            'created_at': [random_date(1200, 1100) for _ in range(len(product_lines))]
         })
         df_p.to_sql('portfolios', con=engine, if_exists='append', index=False)
 
         # ---------------------------
-        # 2. Campaigns (5 Sequential Campaigns)
+        # 3. Campaigns (5 Sequential Phases over 3 Years)
         # ---------------------------
         c_ids = [str(uuid.uuid4()) for _ in range(5)]
         df_c = pd.DataFrame({
@@ -46,15 +42,15 @@ def generate_realistic_company_data():
             'name': [f'Growth_Strategy_Phase_{i+1}' for i in range(5)],
             'type': np.random.choice(['SP', 'SB'], 5),
             'status': 'ENABLED',
-            'daily_budget': np.random.uniform(200, 800, 5),
+            'daily_budget': np.random.uniform(400, 1200, 5), # Slightly higher budget for 3 yr scale
             'targeting_type': np.random.choice(['AUTO', 'MANUAL'], 5),
             'bidding_strategy': 'DYNAMIC_DOWN_ONLY',
-            'created_at': [random_date(400, 380) for _ in range(5)]
+            'created_at': [random_date(1200, 1100) for _ in range(5)]
         })
         df_c.to_sql('campaigns', con=engine, if_exists='append', index=False)
 
         # ---------------------------
-        # 3. Products
+        # 4. Products
         # ---------------------------
         prod_count = 50
         prod_ids = [str(uuid.uuid4()) for _ in range(prod_count)]
@@ -65,12 +61,12 @@ def generate_realistic_company_data():
             'price': np.round(np.random.uniform(40, 500, prod_count), 2),
             'margin': 0.35,
             'category': 'Electronics',
-            'created_at': [random_date(400, 365) for _ in range(prod_count)]
+            'created_at': [random_date(1200, 1100) for _ in range(prod_count)]
         })
         df_prod.to_sql('products', con=engine, if_exists='append', index=False)
 
         # ---------------------------
-        # 4. Campaign Products
+        # 5. Campaign Products (Bridge Table)
         # ---------------------------
         df_cp = pd.DataFrame({
             'id': [str(uuid.uuid4()) for _ in range(100)],
@@ -78,48 +74,56 @@ def generate_realistic_company_data():
             'product_id': np.random.choice(prod_ids, 100),
             'bid': np.round(np.random.uniform(0.8, 3.5, 100), 2),
             'status': 'ENABLED',
-            'created_at': [random_date(350, 300) for _ in range(100)]
+            'created_at': [random_date(1100, 1000) for _ in range(100)]
         })
         df_cp.to_sql('campaign_products', con=engine, if_exists='append', index=False)
 
         # ---------------------------
-        # 5. Performance Metrics
+        # 6. Performance Metrics (1095 Days / 3 Years)
         # ---------------------------
         metrics = []
-        dates = pd.date_range(end=datetime.now(), periods=365)
-        days_per_phase = 365 // 5
+        total_days = 1095 
+        dates = pd.date_range(end=datetime.now(), periods=total_days)
+        days_per_phase = total_days // 5
 
         for i, d in enumerate(dates):
+            # Decide which campaign is active based on time
             phase_idx = min(i // days_per_phase, 4) 
             c_id = c_ids[phase_idx]
 
-            # Seasonal Factors
+            # Seasonal & Growth Factors
             is_weekend = 1 if d.weekday() >= 5 else 0
-            weekend_boost = 1.25 if is_weekend == 1 else 1.0
-            month_end_boost = 1.15 if d.day > 25 else 1.0
-            growth_factor = 1 + (i / 400) 
+            weekend_boost = 1.30 if is_weekend == 1 else 1.0
+            month_end_boost = 1.25 if d.day > 25 else 1.0
+            
+            # Yearly Growth Factor: Sales improve roughly 10-15% per year
+            yearly_growth = 1 + (i / 800) 
 
-            # Base Logic
-            cpc = round(np.random.uniform(0.8, 1.6), 2)
-            spend = np.random.uniform(100, 300) * growth_factor * weekend_boost
+            # Core Advertising Logic (Correlated)
+            # CPC fluctuates slightly
+            cpc = round(np.random.uniform(0.9, 1.8), 2)
+            
+            # Spend depends on growth and seasonality
+            base_spend = np.random.uniform(150, 450)
+            spend = round(base_spend * yearly_growth * weekend_boost, 2)
+            
+            # Clicks = Spend / CPC
             clicks = max(1, int(spend / cpc))
             
-            # Impressions (Calculated from CTR)
-            ctr = round(np.random.uniform(0.015, 0.04), 4)
+            # CTR between 1.5% and 4.5%
+            ctr = round(np.random.uniform(0.015, 0.045), 4)
             impressions = int(clicks / ctr)
 
-            # Orders (Rounded to ensure low click days still get sales)
-            base_cvr = 0.05 + (phase_idx * 0.01)
+            # Conversion Rate (CVR) improves with phases (campaign optimization)
+            base_cvr = 0.05 + (phase_idx * 0.008)
             cvr = round(np.random.uniform(base_cvr, base_cvr + 0.02) * month_end_boost, 3)
             orders = int(np.round(clicks * cvr))
 
-            # Sales & Product Assignment
+            # Fetch product price for sales calculation
             product_id = np.random.choice(prod_ids)
             price = df_prod.loc[df_prod['id'] == product_id, 'price'].values[0]
             
             sales = round(orders * price, 2) if orders > 0 else 0.0
-
-            # ACOS & ROAS (Safe calculation)
             acos = round((spend / sales) * 100, 2) if sales > 0 else 0.0
             roas = round(sales / spend, 2) if spend > 0 else 0.0
 
@@ -130,7 +134,7 @@ def generate_realistic_company_data():
                 'is_weekend': is_weekend,
                 'impressions': impressions,
                 'clicks': clicks,
-                'spend': round(spend, 2),
+                'spend': spend,
                 'sales': sales,
                 'orders': orders,
                 'acos': acos,
@@ -141,21 +145,45 @@ def generate_realistic_company_data():
                 'product_id': product_id
             })
 
-        pd.DataFrame(metrics).to_sql('performance_metrics', con=engine, if_exists='append', index=False)
-        print(f"✅ Success: Generated 365 sequential rows with realistic sales.")
+        # ---------------------------
+        # 7. Feature Engineering Layer
+        # ---------------------------
+        master_df = pd.DataFrame(metrics)
+        # Sorting is CRITICAL for Lags
+        master_df = master_df.sort_values(by=['campaign_id', 'date'])
+
+        # Create Lags (Previous values for prediction)
+        master_df['sales_lag_1'] = master_df.groupby('campaign_id')['sales'].shift(1)
+        master_df['sales_lag_7'] = master_df.groupby('campaign_id')['sales'].shift(7)
+        master_df['roas_lag_1'] = master_df.groupby('campaign_id')['roas'].shift(1)
+        master_df['acos_lag_1'] = master_df.groupby('campaign_id')['acos'].shift(1)
+
+        # Rolling Mean for 7 days trend
+        master_df['rolling_mean_7'] = master_df.groupby('campaign_id')['sales'].shift(1).rolling(window=7).mean()
+
+        # Fill first few days NaNs with 0
+        master_df.fillna(0, inplace=True)
+
+        # Save to Database
+        master_df.to_sql('performance_metrics', con=engine, if_exists='append', index=False)
+        
+        print(f"✅ Success: Generated {total_days} days (3 Years) of realistic data.")
+        print(f"Total Rows in Performance Metrics: {len(master_df)}")
 
     except Exception as e:
-        print(f"❌ ERROR: {e}")
+        print(f"❌ ERROR in Data Generation: {e}")
 
 # ---------------------------
-# Main Execution
+# 8. Main Execution Logic
 # ---------------------------
 if __name__ == "__main__":
     with engine.begin() as conn:
+        # Stop constraints to truncate safely
         conn.execute(text("SET FOREIGN_KEY_CHECKS = 0;"))
         tables = ['performance_metrics', 'campaign_products', 'products', 'campaigns', 'portfolios']
         for t in tables:
             conn.execute(text(f"TRUNCATE TABLE {t};"))
         conn.execute(text("SET FOREIGN_KEY_CHECKS = 1;"))
+        print("🗑️ Database Cleared.")
 
-    generate_realistic_company_data()
+    generate_3_year_realistic_data()
