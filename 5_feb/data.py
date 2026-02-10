@@ -7,43 +7,42 @@ from datetime import datetime, timedelta
 # ---------------------------
 # 1. Database Connection
 # ---------------------------
-# Database credentials aapke original code ke hisaab se set hain
 engine = create_engine('mysql+pymysql://root:Admin%40123@localhost/amazon_ads_db')
 
-def generate_3_year_realistic_data():
+def generate_full_system_data():
     try:
-        # Helper: random date generator for initial creation dates
+        # Helper: Random date generator
         def random_date(start_days_ago, end_days_ago):
             return datetime.now() - timedelta(days=np.random.randint(end_days_ago, start_days_ago))
 
         # ---------------------------
-        # 2. Portfolios (4 Main Categories)
+        # 2. Portfolios
         # ---------------------------
         product_lines = ['Premium_Audio', 'Gaming_Accessories', 'Office_Setup', 'Mobile_Gear']
         p_ids = [str(uuid.uuid4()) for _ in range(len(product_lines))]
         df_p = pd.DataFrame({
             'id': p_ids,
             'name': product_lines,
-            'budget_amount': np.random.uniform(50000, 100000, len(product_lines)),
-            'budget_start': [random_date(1200, 1100).date() for _ in range(len(product_lines))],
-            'budget_end': [(datetime.now() + timedelta(days=365)).date() for _ in range(len(product_lines))],
+            'budget_amount': np.random.uniform(500000, 1000000, len(product_lines)),
+            'budget_start': [random_date(1200, 1100).date() for _ in range(4)],
+            'budget_end': [(datetime.now() + timedelta(days=365)).date() for _ in range(4)],
             'status': 'ENABLED',
-            'created_at': [random_date(1200, 1100) for _ in range(len(product_lines))]
+            'created_at': [random_date(1200, 1100) for _ in range(4)]
         })
         df_p.to_sql('portfolios', con=engine, if_exists='append', index=False)
 
         # ---------------------------
-        # 3. Campaigns (5 Sequential Phases over 3 Years)
+        # 3. Campaigns
         # ---------------------------
         c_ids = [str(uuid.uuid4()) for _ in range(5)]
         df_c = pd.DataFrame({
             'id': c_ids,
             'portfolio_id': [np.random.choice(p_ids) for _ in range(5)],
             'name': [f'Growth_Strategy_Phase_{i+1}' for i in range(5)],
-            'type': np.random.choice(['SP', 'SB'], 5),
+            'type': 'SP', 
             'status': 'ENABLED',
-            'daily_budget': np.random.uniform(400, 1200, 5), # Slightly higher budget for 3 yr scale
-            'targeting_type': np.random.choice(['AUTO', 'MANUAL'], 5),
+            'daily_budget': np.random.uniform(500, 3000, 5), # Range widened to show clear priority
+            'targeting_type': np.random.choice(['AUTO', 'MANUAL'], 5, p=[0.4, 0.6]),
             'bidding_strategy': 'DYNAMIC_DOWN_ONLY',
             'created_at': [random_date(1200, 1100) for _ in range(5)]
         })
@@ -52,13 +51,13 @@ def generate_3_year_realistic_data():
         # ---------------------------
         # 4. Products
         # ---------------------------
-        prod_count = 50
+        prod_count = 20
         prod_ids = [str(uuid.uuid4()) for _ in range(prod_count)]
         df_prod = pd.DataFrame({
             'id': prod_ids,
             'asin': [f"B0{uuid.uuid4().hex[:8].upper()}" for _ in range(prod_count)],
-            'name': [f'Electronic_Gadget_{i}' for i in range(prod_count)],
-            'price': np.round(np.random.uniform(40, 500, prod_count), 2),
+            'name': [f'Gadget_{i}' for i in range(prod_count)],
+            'price': np.random.choice([499, 999, 1499, 1999, 2499], prod_count),
             'margin': 0.35,
             'category': 'Electronics',
             'created_at': [random_date(1200, 1100) for _ in range(prod_count)]
@@ -69,121 +68,112 @@ def generate_3_year_realistic_data():
         # 5. Campaign Products (Bridge Table)
         # ---------------------------
         df_cp = pd.DataFrame({
-            'id': [str(uuid.uuid4()) for _ in range(100)],
-            'campaign_id': np.random.choice(c_ids, 100),
-            'product_id': np.random.choice(prod_ids, 100),
-            'bid': np.round(np.random.uniform(0.8, 3.5, 100), 2),
+            'id': [str(uuid.uuid4()) for _ in range(40)],
+            'campaign_id': np.random.choice(c_ids, 40),
+            'product_id': np.random.choice(prod_ids, 40),
+            'bid': np.round(np.random.uniform(1.5, 4.5, 40), 2),
             'status': 'ENABLED',
-            'created_at': [random_date(1100, 1000) for _ in range(100)]
+            'created_at': [random_date(1100, 1000) for _ in range(40)]
         })
         df_cp.to_sql('campaign_products', con=engine, if_exists='append', index=False)
 
         # ---------------------------
-        # 6. Performance Metrics (1095 Days / 3 Years)
+        # 6. Performance Metrics (PRIORITY LOGIC)
         # ---------------------------
         metrics = []
-        total_days = 1095 
+        total_days = 1095  # 3 Years
         dates = pd.date_range(end=datetime.now(), periods=total_days)
-        days_per_phase = total_days // 5
 
         for i, d in enumerate(dates):
-            # Decide which campaign is active based on time
-            phase_idx = min(i // days_per_phase, 4) 
-            c_id = c_ids[phase_idx]
-
-            # Seasonal & Growth Factors
             is_weekend = 1 if d.weekday() >= 5 else 0
-            weekend_boost = 1.30 if is_weekend == 1 else 1.0
-            month_end_boost = 1.25 if d.day > 25 else 1.0
+            month = d.month
+            day_of_month = d.day
             
-            # Yearly Growth Factor: Sales improve roughly 10-15% per year
-            yearly_growth = 1 + (i / 800) 
+            # --- HIGH PRIORITY BOOSTS ---
+            # Weekend boost increased to 2.8x so model sees it as a major driver
+            weekend_boost = 2.8 if is_weekend else 1.0
+            payday_boost = 1.30 if (day_of_month <= 5 or day_of_month >= 25) else 1.0
+            yearly_growth = 1 + (i / 900)
 
-            # Core Advertising Logic (Correlated)
-            # CPC fluctuates slightly
-            cpc = round(np.random.uniform(0.9, 1.8), 2)
-            
-            # Spend depends on growth and seasonality
-            base_spend = np.random.uniform(150, 450)
-            spend = round(base_spend * yearly_growth * weekend_boost, 2)
-            
-            # Clicks = Spend / CPC
-            clicks = max(1, int(spend / cpc))
-            
-            # CTR between 1.5% and 4.5%
-            ctr = round(np.random.uniform(0.015, 0.045), 4)
-            impressions = int(clicks / ctr)
+            c_row = df_c.sample(1).iloc[0]
+            p_row = df_prod.sample(1).iloc[0]
 
-            # Conversion Rate (CVR) improves with phases (campaign optimization)
-            base_cvr = 0.05 + (phase_idx * 0.008)
-            cvr = round(np.random.uniform(base_cvr, base_cvr + 0.02) * month_end_boost, 3)
-            orders = int(np.round(clicks * cvr))
-
-            # Fetch product price for sales calculation
-            product_id = np.random.choice(prod_ids)
-            price = df_prod.loc[df_prod['id'] == product_id, 'price'].values[0]
+            # --- DAILY BUDGET PRIORITY ---
+            # Budget ka direct 20% impact sales value par
+            daily_budget = c_row['daily_budget']
+            price = p_row['price']
             
-            sales = round(orders * price, 2) if orders > 0 else 0.0
-            acos = round((spend / sales) * 100, 2) if sales > 0 else 0.0
-            roas = round(sales / spend, 2) if spend > 0 else 0.0
+            # Mathematical Core: Budget and Weekend are now primary multipliers
+            base_sales_val = (daily_budget * 0.20) * weekend_boost * payday_boost * yearly_growth
+            noise = np.random.normal(1, 0.03) # Low noise means stronger signal
+            sales = round(base_sales_val * noise, 2)
+            
+            orders = int(sales / price) if sales > price else (1 if np.random.random() > 0.8 else 0)
+            spend = round(daily_budget * np.random.uniform(0.85, 0.98), 2)
+            
+            clicks = max(1, int(spend / np.random.uniform(1.5, 3.0)))
+            impressions = clicks * np.random.randint(25, 60)
+            cpc = round(spend/clicks, 2)
+            ctr = round(clicks/impressions, 4)
+            cvr = round(orders/clicks, 3) if clicks > 0 else 0
 
             metrics.append({
                 'id': str(uuid.uuid4()),
-                'campaign_id': c_id,
+                'campaign_id': c_row['id'],
                 'date': d.date(),
                 'is_weekend': is_weekend,
+                'month': month,
+                'day_of_month': day_of_month,
                 'impressions': impressions,
                 'clicks': clicks,
                 'spend': spend,
                 'sales': sales,
                 'orders': orders,
-                'acos': acos,
-                'roas': roas,
+                'acos': round((spend/sales)*100, 2) if sales > 0 else 0,
+                'roas': round(sales/spend, 2) if spend > 0 else 0,
                 'ctr': ctr,
                 'cpc': cpc,
                 'cvr': cvr,
-                'product_id': product_id
+                'product_id': p_row['id'],
+                'daily_budget': daily_budget,
+                'price': price
             })
 
         # ---------------------------
-        # 7. Feature Engineering Layer
+        # 7. Advanced Feature Engineering (Rolling Mean 14 & 30 Integration)
         # ---------------------------
         master_df = pd.DataFrame(metrics)
-        # Sorting is CRITICAL for Lags
         master_df = master_df.sort_values(by=['campaign_id', 'date'])
 
-        # Create Lags (Previous values for prediction)
         master_df['sales_lag_1'] = master_df.groupby('campaign_id')['sales'].shift(1)
         master_df['sales_lag_7'] = master_df.groupby('campaign_id')['sales'].shift(7)
-        master_df['roas_lag_1'] = master_df.groupby('campaign_id')['roas'].shift(1)
-        master_df['acos_lag_1'] = master_df.groupby('campaign_id')['acos'].shift(1)
+        
+        master_df['avg_sales_7d'] = master_df.groupby('campaign_id')['sales'].transform(lambda x: x.shift(1).rolling(window=7).mean())
+        master_df['avg_spend_7d'] = master_df.groupby('campaign_id')['spend'].transform(lambda x: x.shift(1).rolling(window=7).mean())
+        
+        master_df['rolling_mean_14'] = master_df.groupby('campaign_id')['sales'].transform(lambda x: x.shift(1).rolling(window=14).mean())
+        master_df['rolling_mean_30'] = master_df.groupby('campaign_id')['sales'].transform(lambda x: x.shift(1).rolling(window=30).mean())
 
-        # Rolling Mean for 7 days trend
-        master_df['rolling_mean_7'] = master_df.groupby('campaign_id')['sales'].shift(1).rolling(window=7).mean()
-
-        # Fill first few days NaNs with 0
         master_df.fillna(0, inplace=True)
-
-        # Save to Database
+        
+        # SQL Save
         master_df.to_sql('performance_metrics', con=engine, if_exists='append', index=False)
         
-        print(f"✅ Success: Generated {total_days} days (3 Years) of realistic data.")
-        print(f"Total Rows in Performance Metrics: {len(master_df)}")
+        print(f"✅ Priority Data Generated! Focus: Daily Budget & Weekends. Total: {len(master_df)}")
 
     except Exception as e:
-        print(f"❌ ERROR in Data Generation: {e}")
+        print(f"❌ ERROR: {e}")
 
 # ---------------------------
-# 8. Main Execution Logic
+# 8. Main Execution
 # ---------------------------
 if __name__ == "__main__":
     with engine.begin() as conn:
-        # Stop constraints to truncate safely
         conn.execute(text("SET FOREIGN_KEY_CHECKS = 0;"))
         tables = ['performance_metrics', 'campaign_products', 'products', 'campaigns', 'portfolios']
         for t in tables:
-            conn.execute(text(f"TRUNCATE TABLE {t};"))
+            conn.execute(text(f"DROP TABLE IF EXISTS {t};"))
+            print(f"🗑️ Cleaned: {t}")
         conn.execute(text("SET FOREIGN_KEY_CHECKS = 1;"))
-        print("🗑️ Database Cleared.")
 
-    generate_3_year_realistic_data()
+    generate_full_system_data()
