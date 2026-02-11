@@ -1,0 +1,21 @@
+API Onboarding & Registration:
+
+Initiated the Amazon Ads API Onboarding workflow via the Advanced Tools Center.
+
+Submitted the official API Access Application under the "Developer/Solution Provider" category.
+
+Defined the AI use-case, focusing on Automated Bid Optimization and Predictive Sales Analytics to justify the need for data access.
+
+
+
+Current Status:
+
+Application Status: Under Review (Amazon typically takes 1 business day for approval).
+
+Attatched information:
+
+Apply as an advisor
+Company Name:The InfowareHouse
+Countries : India
+API use :Agency and plan to use the Amazon Ads API to manage advertising for my clients
+Advertising - Manage advertising campaigns and creative, and receive advertising reporting metrics.
