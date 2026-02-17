@@ -1,0 +1,28 @@
+1. ADVERTISING STRUCTURE (PPC)
+Automatic Discovery Campaigns: Utilizing Amazon’s internal AI to identify which search terms naturally convert for our specific products.
+
+Manual Bidding Optimization:
+
+Top of Search (TOS) Bidding: Increasing bids by 50-100% for high-intent keywords to secure the #1 spot.
+
+Negative Keyword Filtering: Using AI to instantly block irrelevant searches (e.g., "Aloe Vera Hair Gel") to save ad spend.
+
+Competitor Targeting: Placing Sponsored Display ads directly on competitor product pages to capture their traffic.
+
+2. AI SYSTEM ARCHITECTURE (Automation Workflow)
+The proposed system will function on the following technology logic:
+
+Data Collection: Fetching real-time Amazon Search Term Reports and Business Reports.
+
+Decision Logic (AI Agent):
+
+High Performance: If a keyword has a high conversion rate, the AI automatically increases the bid.
+
+Low Performance: If a keyword spends budget without sales, the AI pauses or lowers the bid.
+
+Execution: Leveraging Amazon’s Selling Partner API (SP-API) to push these changes automatically without manual intervention.
+
+3. CONVERSION & VISUAL OPTIMIZATION
+AI-Generated Creative: Using AI image tools to create lifestyle backgrounds (e.g., a fresh kitchen setting) to make the product look premium.
+
+Video Ads: Implementing 15-second AI-generated video loops that showcase the "Immunity" and "Detox" benefits, which occupy more mobile screen space.
