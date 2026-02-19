@@ -1,0 +1,54 @@
+AMAZON AI BIDDING MODEL: FULL-STACK ENTERPRISE ARCHITECTURE
+1. INPUT DATA (The Context)
+
+Product Info: ASIN, Name, Selling Price (SP), Cost Per Unit (CPU).
+Targeting: Keyword, Match Type (Exact/Phrase/Broad).
+Current Metrics: Impressions, Clicks, CTR, Actual CPC, Organic Rank.
+Competition: Competitor Price, Competitor Ratings/Reviews (Fully Automated via API).
+Constraints: Target ACOS%, Max Bid Limit, Inventory/Stock Levels.
+
+
+
+2. THE CONNECTIVITY LAYER (The "Bridge" Logic)
+
+> This section explains how the systems talk to each other. Your Python script acts as the "Manager" using API Keys.
+
+External Data Sync (Keepa/Rainforest API): Python sends a "Request" with your target ASINs. The API returns a JSON object containing live competitor prices and ratings.
+Internal Data Sync (Amazon Advertising API): Python authenticates using `OAuth 2.0` (Client ID & Secret) to pull your live campaign metrics (Clicks, Sales, Spend).
+Data Integration (The master_df): Python’s `Pandas` library merges these two different data streams into one single table (master_df) every 6 hours.
+
+3. ML PREDICTIONS (The AI Brain)
+
+Predicted CVR (pCVR): Looking at past patterns and current competition (Price/Rating fetched via API), the model predicts the probability (%) of a click converting into a sale.
+Predicted CTR: The probability of an ad being clicked based on current market trends.
+Market CPC Trend: An estimate of the bid amount required for a top rank in the auction.
+
+
+
+4. BID CALCULATION FORMULA (The Math)
+Target CPA (Cost Per Acquisition): `Selling Price × Target ACOS%`.
+Base Bid (Mathematical Anchor): `Target CPA × Predicted CVR = Profit-Safe Bid`.
+
+
+5. STRATEGIC ADJUSTMENTS (The Decision Engine)
+To determine the Final Bid, the following "Multipliers" are applied to the Base Bid via the Python Script:
+
+A. Organic Rank Rule: If Rank > 10 (1.2x Push) | If Rank < 5 (0.9x Save).
+B. Inventory Rule: If Stock < 10 days (0.3x Cool down) | If Stock High (1.0x).
+C. Competition Rule: If My Rating > Competitor (1.1x Boost) | If My Price > Competitor (0.8x Conservative).
+
+6. AUTOMATED EXECUTION LOOP (The Continuous Cycle)
+
+1. Trigger: A "Cron Job" or Cloud Scheduler starts the Python script every 6 hours.
+2. Auth & Fetch: Script logs into Keepa and Amazon APIs to pull fresh market and performance data.
+3. Clean & Merge: Python prepares the master_df by cleaning any missing values.
+4. Inference: The `.pkl` model file is loaded to generate the `pCVR` for every keyword.
+5. Calculate: The Decision Engine applies the Multipliers to reach the Final_Bid.
+6. Push: Python sends a "POST" request to the Amazon Ads API to update the bids live on Seller Central.
+
+
+7. SAFETY & GUARDRAILS
+
+Stop-Loss: The script automatically kills a bid if it exceeds `Profit_Per_Unit * CVR`.
+Max-Bid Cap: A hard-coded ceiling (e.g., ₹40) that the AI can never cross.
+Error Handling: If an API fails to respond, the script "Falls Back" to the last known safe bid instead of setting it to zero.
